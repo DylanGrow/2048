@@ -3,111 +3,153 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>2048: Chaos Mechanics</title>
+  <title>2048: AI Assistant Edition</title>
   <style>
-    :root { 
-      --bg: #121212; --grid: #2c2c2c; --size: 70px; --gap: 8px; --rad: 8px;
+    :root {
+      --bg: #0f172a; --panel: #1e293b; --grid: #334155; --text: #f8fafc;
+      --accent: #38bdf8; --danger: #ef4444;
+      --size: clamp(60px, 15vw, 100px); --gap: clamp(8px, 2vw, 12px);
     }
-    body { 
-      margin: 0; font-family: system-ui; background: var(--bg); 
-      color: #fff; display: flex; flex-direction: column; align-items: center; 
-      padding-top: 2vh; touch-action: none; overflow: hidden;
-    }
-    .toolbar { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; justify-content: center; width: 100%; max-width: 400px;}
-    button, select { background: #444; color: #fff; border: none; padding: 10px; border-radius: 5px; cursor: pointer; font-weight: bold; }
     
-    #game-wrapper {
-      position: relative; transition: transform 0.1s;
-    }
-    .shake { animation: shake 0.3s cubic-bezier(.36,.07,.19,.97) both; }
-    @keyframes shake {
-      10%, 90% { transform: translate3d(-2px, 0, 0); }
-      20%, 80% { transform: translate3d(4px, 0, 0); }
-      30%, 50%, 70% { transform: translate3d(-8px, 0, 0); }
-      40%, 60% { transform: translate3d(8px, 0, 0); }
+    body {
+      margin: 0; font-family: 'Inter', system-ui, sans-serif;
+      background: var(--bg); color: var(--text);
+      display: flex; flex-direction: column; height: 100vh;
+      overflow: hidden;
     }
 
-    #board { 
-      position: relative; background: var(--grid); padding: var(--gap); 
-      border-radius: 12px; box-sizing: border-box;
+    /* Layout: Stacked on mobile, Side-by-side on desktop */
+    #app-layout {
+      display: flex; flex-direction: column; width: 100%; max-width: 1200px;
+      margin: 0 auto; height: 100%; padding: 20px; box-sizing: border-box; gap: 20px;
     }
+    @media (min-width: 800px) {
+      #app-layout { flex-direction: row; align-items: center; justify-content: center; }
+    }
+
+    /* Dashboard / AI Panel */
+    #dashboard {
+      flex: 1; background: var(--panel); padding: 20px; border-radius: 16px;
+      display: flex; flex-direction: column; gap: 15px; max-width: 400px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+    h1 { margin: 0; color: var(--accent); font-size: 2.5rem; letter-spacing: -1px; }
+    
+    .stats-row { display: flex; gap: 10px; }
+    .stat-box { background: var(--bg); padding: 10px; border-radius: 8px; flex: 1; text-align: center; }
+    .stat-box span { display: block; font-size: 0.8rem; color: #94a3b8; text-transform: uppercase; }
+    .stat-box strong { font-size: 1.5rem; }
+
+    #ai-panel {
+      background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3);
+      padding: 15px; border-radius: 8px; margin-top: auto;
+    }
+    #ai-panel h3 { margin: 0 0 10px 0; color: var(--accent); display: flex; align-items: center; gap: 8px; }
+    #ai-output { font-size: 0.95rem; line-height: 1.4; color: #cbd5e1; }
+    
+    button {
+      background: var(--accent); color: #0f172a; border: none; padding: 12px;
+      border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: pointer;
+      transition: opacity 0.2s; width: 100%;
+    }
+    button:hover { opacity: 0.8; }
+    button.secondary { background: var(--grid); color: var(--text); }
+
+    /* Game Board */
+    #game-zone {
+      position: relative; display: flex; justify-content: center; align-items: center;
+    }
+    #board {
+      position: relative; background: var(--grid); padding: var(--gap);
+      border-radius: 16px; width: calc(var(--size)*4 + var(--gap)*5);
+      height: calc(var(--size)*4 + var(--gap)*5); box-sizing: border-box;
+    }
+    
     .bg-cell {
-      position: absolute; width: var(--size); height: var(--size); 
-      background: #3d3d3d; border-radius: var(--rad);
+      position: absolute; width: var(--size); height: var(--size);
+      background: rgba(15, 23, 42, 0.4); border-radius: 8px;
     }
-    
-    .tile { 
-      position: absolute; width: var(--size); height: var(--size); 
-      border-radius: var(--rad); display: flex; justify-content: center; align-items: center; 
-      font-size: 1.5rem; font-weight: bold; transition: transform 150ms ease; 
-      z-index: 2;
+    .tile {
+      position: absolute; width: var(--size); height: var(--size);
+      border-radius: 8px; display: flex; justify-content: center; align-items: center;
+      font-size: 2rem; font-weight: 800; transition: transform 150ms ease;
     }
 
-    /* Core Colors */
-    .val-2 { background: #eee4da; color: #000; } 
-    .val-4 { background: #ede0c8; color: #000; }
-    .val-8 { background: #f2b179; } .val-16 { background: #f59563; }
-    .val-32 { background: #f67c5f; } .val-64 { background: #f65e3b; }
-    .val-128 { background: #e53935; box-shadow: 0 0 15px rgba(229,57,53,0.4); }
-    
-    /* Special Tiles */
-    .val-R { background: #555; color: #222; border: 2px solid #333; }
-    .val-W { background: linear-gradient(45deg, #ff00cc, #3333ff); box-shadow: 0 0 10px #ff00cc; }
-    .val-anti { background: #000; border: 2px dashed #ff0044; color: #ff0044; }
+    /* Colors */
+    .val-2 { background: #334155; color: #fff; }
+    .val-4 { background: #475569; color: #fff; }
+    .val-8 { background: #0ea5e9; color: #fff; }
+    .val-16 { background: #0284c7; color: #fff; }
+    .val-32 { background: #0369a1; color: #fff; }
+    .val-64 { background: #075985; color: #fff; }
+    .val-128 { background: #f59e0b; color: #000; }
+    .val-256, .val-512, .val-1024, .val-2048 { background: #fbbf24; color: #000; box-shadow: 0 0 20px rgba(251, 191, 36, 0.4); }
 
+    /* Game Over Overlay */
+    #game-over {
+      position: absolute; inset: 0; background: rgba(15, 23, 42, 0.8);
+      backdrop-filter: blur(8px); display: flex; flex-direction: column;
+      justify-content: center; align-items: center; border-radius: 16px;
+      opacity: 0; pointer-events: none; transition: opacity 0.5s ease; z-index: 10;
+    }
+    #game-over.active { opacity: 1; pointer-events: auto; }
+    #game-over h2 { font-size: 3rem; margin: 0 0 20px 0; color: var(--danger); }
   </style>
 </head>
 <body>
 
-  <div class="toolbar">
-    <select id="grid-size" onchange="changeSize()">
-      <option value="3">3x3 Grid</option>
-      <option value="4" selected>4x4 Grid</option>
-      <option value="5">5x5 Grid</option>
-    </select>
-    <button onclick="toggleChaos()" id="chaos-btn">Chaos: OFF</button>
-    <button onclick="restart()">Restart</button>
-  </div>
+  <div id="app-layout">
+    <aside id="dashboard">
+      <h1>2048</h1>
+      <div class="stats-row">
+        <div class="stat-box"><span>Score</span><strong id="score">0</strong></div>
+        <div class="stat-box"><span>Moves</span><strong id="moves">0</strong></div>
+      </div>
+      
+      <div id="ai-panel">
+        <h3>🤖 AI Analyst</h3>
+        <div id="ai-output">Waiting for game to start... Click 'Analyze' for a hint.</div>
+      </div>
 
-  <div id="game-wrapper">
-    <div id="board"></div>
+      <button onclick="getAIHint()">🔍 Analyze Best Move</button>
+      <button class="secondary" onclick="init()">🔄 Restart Game</button>
+    </aside>
+
+    <main id="game-zone">
+      <div id="board">
+        </div>
+      <div id="game-over">
+        <h2>No Moves Left!</h2>
+        <button onclick="init()" style="width: auto; padding: 15px 30px;">Try Again</button>
+      </div>
+    </main>
   </div>
 
   <script>
-    let size = 4;
-    let chaosMode = false;
-    let grid = [];
-    let tileIdCounter = 0;
+    const size = 4;
+    let grid = [], score = 0, moves = 0, tileId = 0;
     const boardEl = document.getElementById('board');
-    const wrapperEl = document.getElementById('game-wrapper');
-
-    function changeSize() {
-      size = parseInt(document.getElementById('grid-size').value);
-      restart();
-    }
-
-    function toggleChaos() {
-      chaosMode = !chaosMode;
-      document.getElementById('chaos-btn').innerText = `Chaos: ${chaosMode ? 'ON' : 'OFF'}`;
-      document.getElementById('chaos-btn').style.background = chaosMode ? '#e53935' : '#444';
-    }
+    const aiOutput = document.getElementById('ai-output');
 
     function getPos(x) { return `calc(${x} * (var(--size) + var(--gap)) + var(--gap))`; }
 
-    function initBoard() {
+    function init() {
+      grid = []; score = 0; moves = 0;
+      document.getElementById('game-over').classList.remove('active');
       boardEl.innerHTML = '';
-      let boardSize = `calc(${size} * var(--size) + ${size + 1} * var(--gap))`;
-      boardEl.style.width = boardSize;
-      boardEl.style.height = boardSize;
-
-      for (let r = 0; r < size; r++) {
-        for (let c = 0; c < size; c++) {
+      
+      // Draw background
+      for(let r=0; r<size; r++) {
+        for(let c=0; c<size; c++) {
           let bg = document.createElement('div');
           bg.className = 'bg-cell';
           bg.style.transform = `translate(${getPos(c)}, ${getPos(r)})`;
           boardEl.appendChild(bg);
         }
       }
+      
+      aiOutput.innerHTML = "Grid initialized. Try to keep your highest tile in a corner!";
+      spawn(); spawn(); render();
     }
 
     function spawn() {
@@ -116,157 +158,117 @@
         if(!grid.find(t => t.r === r && t.c === c)) empty.push({r,c});
       }
       if(!empty.length) return;
-      
       let {r,c} = empty[Math.floor(Math.random() * empty.length)];
-      let val = Math.random() > 0.1 ? 2 : 4;
-      
-      if (chaosMode) {
-        let chance = Math.random();
-        if (chance < 0.05) val = 'R'; // Rock
-        else if (chance < 0.10) val = 'W'; // Wildcard
-        else if (chance < 0.15) val = -2; // Antimatter
-      }
-
-      grid.push({ r, c, val, id: tileIdCounter++ });
+      grid.push({ r, c, val: Math.random()>0.1?2:4, id: tileId++ });
     }
 
     function render() {
       document.querySelectorAll('.tile').forEach(el => el.remove());
+      document.getElementById('score').innerText = score;
+      document.getElementById('moves').innerText = moves;
+
       grid.forEach(t => {
         let el = document.createElement('div');
-        let cssVal = t.val;
-        if (t.val === 'R') el.innerText = '🪨';
-        else if (t.val === 'W') { el.innerText = '★'; cssVal = 'W'; }
-        else if (t.val < 0) { el.innerText = t.val; cssVal = 'anti'; }
-        else { el.innerText = t.val; }
-
-        el.className = `tile val-${cssVal}`;
+        el.className = `tile val-${t.val > 2048 ? 2048 : t.val}`;
+        el.innerText = t.val;
         el.style.transform = `translate(${getPos(t.c)}, ${getPos(t.r)})`;
         el.id = `t${t.id}`;
         boardEl.appendChild(el);
       });
+
+      checkGameOver();
     }
 
-    function slideSegment(seg) {
-      let arr = seg.filter(v => v !== 0);
-      let newSeg = [];
-      let i = 0;
-      let shook = false;
-
-      while (i < arr.length) {
-        if (i === arr.length - 1) {
-          newSeg.push(arr[i]); i++;
-        } 
-        // Antimatter Annihilation
-        else if (typeof arr[i].val === 'number' && typeof arr[i+1].val === 'number' && arr[i].val === -arr[i+1].val) {
-          i += 2; // Both destroyed
-        }
-        // Wildcard Merge
-        else if (arr[i].val === 'W' && typeof arr[i+1].val === 'number' && arr[i+1].val > 0) {
-          newSeg.push({ ...arr[i], val: arr[i+1].val * 2 }); i += 2; shook = true;
-        }
-        else if (typeof arr[i].val === 'number' && arr[i].val > 0 && arr[i+1].val === 'W') {
-          newSeg.push({ ...arr[i], val: arr[i].val * 2 }); i += 2; shook = true;
-        }
-        // Normal Merge
-        else if (arr[i].val === arr[i+1].val && arr[i].val !== 'W' && arr[i].val !== 'R') {
-          newSeg.push({ ...arr[i], val: arr[i].val * 2 });
-          if (arr[i].val * 2 >= 128) shook = true;
-          i += 2;
-        } 
-        else {
-          newSeg.push(arr[i]); i++;
-        }
-      }
-
-      if (shook) {
-        wrapperEl.classList.remove('shake');
-        void wrapperEl.offsetWidth; 
-        wrapperEl.classList.add('shake');
-      }
-
-      while (newSeg.length < seg.length) newSeg.push(0);
-      return newSeg;
-    }
-
-    function processLines(dir) {
+    // Core logic separated to allow AI simulation
+    function simulateMove(currentGrid, dir) {
       let moved = false;
-      let newGrid = [];
+      let scoreGained = 0;
+      let newGrid = JSON.parse(JSON.stringify(currentGrid));
 
-      for (let i = 0; i < size; i++) {
-        let line = grid.filter(t => dir === 'up' || dir === 'down' ? t.c === i : t.r === i);
-        line.sort((a, b) => {
-          let posA = dir === 'up' || dir === 'down' ? a.r : a.c;
-          let posB = dir === 'up' || dir === 'down' ? b.r : b.c;
-          return (dir === 'up' || dir === 'left') ? posA - posB : posB - posA;
+      for(let i=0; i<size; i++) {
+        let line = newGrid.filter(t => dir==='up'||dir==='down' ? t.c===i : t.r===i);
+        line.sort((a,b) => {
+          let posA = dir==='up'||dir==='down' ? a.r : a.c;
+          let posB = dir==='up'||dir==='down' ? b.r : b.c;
+          return (dir==='up'||dir==='left') ? posA - posB : posB - posA;
         });
 
-        // Fill with zeros for empty spots
-        let fullLine = Array(size).fill(0);
-        line.forEach(t => {
-          let pos = dir === 'up' || dir === 'down' ? t.r : t.c;
-          let idx = (dir === 'up' || dir === 'left') ? pos : (size - 1 - pos);
-          fullLine[idx] = t;
-        });
-
-        // Split by rocks
-        let resultLine = [];
-        let currentSeg = [];
-        for (let t of fullLine) {
-          if (t !== 0 && t.val === 'R') {
-            resultLine = resultLine.concat(slideSegment(currentSeg));
-            resultLine.push(t);
-            currentSeg = [];
+        for(let j=0; j<line.length; j++) {
+          let target = j;
+          if(j > 0 && line[j].val === line[j-1].val && !line[j-1].merged) {
+            line[j-1].val *= 2; line[j-1].merged = true; scoreGained += line[j-1].val;
+            newGrid = newGrid.filter(t => t.id !== line[j].id);
+            line.splice(j, 1); j--; moved = true;
           } else {
-            currentSeg.push(t);
-          }
-        }
-        resultLine = resultLine.concat(slideSegment(currentSeg));
-
-        // Update coordinates
-        for (let j = 0; j < size; j++) {
-          let t = resultLine[j];
-          if (t !== 0) {
-            let originalPos = dir === 'up' || dir === 'down' ? t.r : t.c;
-            let newPos = (dir === 'up' || dir === 'left') ? j : (size - 1 - j);
-            
-            if (originalPos !== newPos) moved = true;
-            
-            if (dir === 'up' || dir === 'down') t.r = newPos; else t.c = newPos;
-            newGrid.push(t);
+            let curPos = dir==='up'||dir==='down' ? line[j].r : line[j].c;
+            let destPos = (dir==='up'||dir==='left') ? target : size-1-target;
+            if(curPos !== destPos) moved = true;
+            if(dir==='up'||dir==='down') line[j].r = destPos; else line[j].c = destPos;
           }
         }
       }
+      return { moved, newGrid, scoreGained };
+    }
 
-      if (moved || grid.length !== newGrid.length) {
-        grid = newGrid;
-        spawn();
-        render();
+    function processInput(dir) {
+      let result = simulateMove(grid, dir);
+      if(result.moved) {
+        grid = result.newGrid;
+        grid.forEach(t => t.merged = false);
+        score += result.scoreGained;
+        moves++;
+        aiOutput.innerHTML = `Moved ${dir.toUpperCase()}. Keep going!`;
+        spawn(); render();
       }
     }
 
-    function restart() {
-      grid = []; initBoard(); spawn(); spawn(); render();
+    // AI Heuristic Logic
+    function getAIHint() {
+      const dirs = ['up', 'down', 'left', 'right'];
+      let bestMove = null;
+      let maxScore = -1;
+
+      dirs.forEach(dir => {
+        let sim = simulateMove(grid, dir);
+        if (sim.moved) {
+          // Simple AI: Prefers moves that score points and free up grid space
+          let emptyCells = 16 - sim.newGrid.length;
+          let moveScore = sim.scoreGained + (emptyCells * 10);
+          if (moveScore > maxScore) {
+            maxScore = moveScore;
+            bestMove = { dir, score: sim.scoreGained, empty: emptyCells };
+          }
+        }
+      });
+
+      if (bestMove) {
+        aiOutput.innerHTML = `<strong>Recommendation: Swipe ${bestMove.dir.toUpperCase()}</strong><br>
+        Why? This move will create ${bestMove.score > 0 ? 'a merge worth ' + bestMove.score + ' points' : 'better positioning'} and leave you with ${bestMove.empty} empty spaces.`;
+      } else {
+        aiOutput.innerHTML = "No moves available. The grid is locked.";
+      }
+    }
+
+    function checkGameOver() {
+      // Are there empty spots?
+      if (grid.length < 16) return;
+      
+      // Can anything merge?
+      for(let dir of ['up', 'down', 'left', 'right']) {
+        let sim = simulateMove(grid, dir);
+        if (sim.moved) return; // Not game over
+      }
+      
+      document.getElementById('game-over').classList.add('active');
+      aiOutput.innerHTML = "Game Over. The board is full and no adjacent tiles match. You scored " + score + " in " + moves + " moves.";
     }
 
     document.addEventListener('keydown', e => {
-      let map = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' };
-      if (map[e.key]) { e.preventDefault(); processLines(map[e.key]); }
+      let map = {ArrowUp:'up', ArrowDown:'down', ArrowLeft:'left', ArrowRight:'right'};
+      if(map[e.key]) processInput(map[e.key]);
     });
 
-    let tx, ty;
-    document.addEventListener('touchstart', e => { tx = e.touches[0].clientX; ty = e.touches[0].clientY; }, {passive:false});
-    document.addEventListener('touchend', e => {
-      if (!tx || !ty) return;
-      let dx = e.changedTouches[0].clientX - tx, dy = e.changedTouches[0].clientY - ty;
-      if (Math.max(Math.abs(dx), Math.abs(dy)) > 30) {
-        if (Math.abs(dx) > Math.abs(dy)) processLines(dx > 0 ? 'right' : 'left'); 
-        else processLines(dy > 0 ? 'down' : 'up');
-      }
-      tx = null; ty = null;
-    });
-
-    restart();
+    init();
   </script>
 </body>
 </html>
