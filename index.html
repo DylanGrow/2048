@@ -2,128 +2,183 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Custom 2048</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Spicy 2048</title>
   <style>
-    body {
-      background: #faf8ef;
-      font-family: Arial, sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      margin-top: 5vh;
-    }
-    #board {
-      display: grid;
-      grid-template-columns: repeat(4, 80px);
-      gap: 10px;
-      background: #bbada0;
-      padding: 10px;
-      border-radius: 8px;
-    }
-    .tile {
-      width: 80px;
-      height: 80px;
-      background: #cdc1b4;
-      border-radius: 4px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      font-size: 32px;
-      font-weight: bold;
-      color: #776e65;
-    }
-    .val-2 { background: #eee4da; }
-    .val-4 { background: #ede0c8; }
-    .val-8 { background: #f2b179; color: white; }
-    .val-16 { background: #f59563; color: white; }
-    .val-32 { background: #f67c5f; color: white; }
-    .val-64 { background: #f65e3b; color: white; }
+    :root { --bg: #faf8ef; --grid: #bbada0; --text: #776e65; --light: #f9f6f2; }
+    body { margin: 0; font-family: 'Clear Sans', 'Helvetica Neue', Arial, sans-serif; background: var(--bg); color: var(--text); display: flex; flex-direction: column; align-items: center; touch-action: none; overflow: hidden; }
+    header { display: flex; justify-content: space-between; align-items: center; width: 90vw; max-width: 400px; margin-top: 20px; }
+    h1 { font-size: 2.5rem; margin: 0; }
+    .stats { display: flex; gap: 10px; }
+    .stat-box { background: var(--grid); color: white; padding: 5px 15px; border-radius: 5px; text-align: center; font-weight: bold; min-width: 50px; }
+    .stat-box span { display: block; font-size: 0.8rem; color: #eee4da; text-transform: uppercase; }
+    button { background: #8f7a66; color: white; border: none; padding: 10px 20px; font-size: 1.1rem; font-weight: bold; border-radius: 5px; cursor: pointer; margin: 20px 0; transition: background 0.2s; }
+    button:hover { background: #9f8b77; }
+    #game-container { position: relative; width: 90vw; height: 90vw; max-width: 400px; max-height: 400px; background: var(--grid); border-radius: 8px; padding: 10px; box-sizing: border-box; }
+    .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; width: 100%; height: 100%; }
+    .cell { background: rgba(238, 228, 218, 0.35); border-radius: 4px; }
+    .tile { position: absolute; width: calc((100% - 50px) / 4); height: calc((100% - 50px) / 4); border-radius: 4px; display: flex; justify-content: center; align-items: center; font-size: 2rem; font-weight: bold; transition: all 150ms ease-in-out; transform: scale(0); animation: appear 200ms ease forwards; }
+    @keyframes appear { to { transform: scale(1); } }
+    .val-2 { background: #eee4da; color: var(--text); }
+    .val-4 { background: #ede0c8; color: var(--text); }
+    .val-8 { background: #f2b179; color: var(--light); }
+    .val-16 { background: #f59563; color: var(--light); }
+    .val-32 { background: #f67c5f; color: var(--light); }
+    .val-64 { background: #f65e3b; color: var(--light); }
+    .val-128 { background: #edcf72; color: var(--light); font-size: 1.5rem; box-shadow: 0 0 30px 10px rgba(243, 215, 116, 0.3); }
+    .val-256, .val-512, .val-1024, .val-2048 { background: #edcc61; color: var(--light); font-size: 1.2rem; box-shadow: 0 0 30px 10px rgba(243, 215, 116, 0.5); }
+    #game-over { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(238, 228, 218, 0.85); display: flex; flex-direction: column; justify-content: center; align-items: center; border-radius: 8px; opacity: 0; pointer-events: none; transition: opacity 0.4s ease; z-index: 10; }
+    #game-over.active { opacity: 1; pointer-events: auto; }
+    #game-over h2 { font-size: 3rem; margin: 0; color: var(--text); }
   </style>
 </head>
 <body>
-
-  <h1>My 2048</h1>
-  <div id="board"></div>
+  <header>
+    <h1>2048</h1>
+    <div class="stats">
+      <div class="stat-box"><span>Score</span><div id="score">0</div></div>
+      <div class="stat-box"><span>Moves</span><div id="moves">0</div></div>
+    </div>
+  </header>
+  <button onclick="init()">New Game</button>
+  
+  <div id="game-container">
+    <div class="grid" id="grid-bg"></div>
+    <div id="tiles"></div>
+    <div id="game-over">
+      <h2>Game Over!</h2>
+      <button onclick="init()">Try Again</button>
+    </div>
+  </div>
 
   <script>
-    let board = Array.from({ length: 4 }, () => Array(4).fill(0));
-    const boardEl = document.getElementById('board');
+    let board, score, moves;
+    const size = 4;
+    
+    function init() {
+      board = Array(size).fill().map(() => Array(size).fill(0));
+      score = 0; moves = 0;
+      document.getElementById('game-over').classList.remove('active');
+      document.getElementById('grid-bg').innerHTML = Array(16).fill('<div class="cell"></div>').join('');
+      updateDOM();
+      spawn(); spawn();
+    }
 
     function spawn() {
       let empty = [];
-      for (let r = 0; r < 4; r++) {
-        for (let c = 0; c < 4; c++) {
-          if (board[r][c] === 0) empty.push({ r, c });
-        }
-      }
-      if (empty.length > 0) {
-        let { r, c } = empty[Math.floor(Math.random() * empty.length)];
-        board[r][c] = Math.random() > 0.1 ? 2 : 4;
+      board.forEach((r, i) => r.forEach((c, j) => { if(!c) empty.push({i,j}) }));
+      if (empty.length) {
+        let {i, j} = empty[Math.floor(Math.random() * empty.length)];
+        board[i][j] = Math.random() > 0.1 ? 2 : 4;
+        updateDOM();
+        checkGameOver();
       }
     }
 
-    function render() {
-      boardEl.innerHTML = '';
-      for (let r = 0; r < 4; r++) {
-        for (let c = 0; c < 4; c++) {
+    function updateDOM() {
+      const container = document.getElementById('tiles');
+      container.innerHTML = '';
+      const padding = 10;
+      board.forEach((r, i) => r.forEach((val, j) => {
+        if (val) {
           let tile = document.createElement('div');
-          let val = board[r][c];
-          tile.className = `tile ${val > 0 ? 'val-' + val : ''}`;
-          tile.textContent = val > 0 ? val : '';
-          boardEl.appendChild(tile);
+          tile.className = `tile val-${val > 2048 ? 2048 : val}`;
+          tile.textContent = val;
+          tile.style.top = `calc(${i * 25}% + ${padding}px)`;
+          tile.style.left = `calc(${j * 25}% + ${padding}px)`;
+          container.appendChild(tile);
         }
-      }
+      }));
+      document.getElementById('score').textContent = score;
+      document.getElementById('moves').textContent = moves;
     }
 
-    function slide(row) {
-      let arr = row.filter(val => val);
-      for (let i = 0; i < arr.length - 1; i++) {
-        if (arr[i] === arr[i + 1]) {
-          arr[i] *= 2;
-          arr[i + 1] = 0;
-        }
-      }
-      arr = arr.filter(val => val);
-      while (arr.length < 4) arr.push(0);
-      return arr;
-    }
-
-    function move(direction) {
+    function move(dir) {
       let moved = false;
-      for (let i = 0; i < 4; i++) {
-        let row = [];
-        for (let j = 0; j < 4; j++) {
-          if (direction === 'ArrowLeft') row.push(board[i][j]);
-          if (direction === 'ArrowRight') row.push(board[i][3 - j]);
-          if (direction === 'ArrowUp') row.push(board[j][i]);
-          if (direction === 'ArrowDown') row.push(board[3 - j][i]);
+      let newBoard = JSON.parse(JSON.stringify(board));
+      
+      const slide = row => {
+        let arr = row.filter(v => v);
+        for (let i = 0; i < arr.length - 1; i++) {
+          if (arr[i] === arr[i+1]) { 
+            arr[i] *= 2; 
+            score += arr[i]; 
+            arr[i+1] = 0; 
+          }
         }
-        
-        let newRow = slide(row);
-        
-        for (let j = 0; j < 4; j++) {
-          let targetR = direction === 'ArrowUp' ? j : direction === 'ArrowDown' ? 3 - j : i;
-          let targetC = direction === 'ArrowLeft' ? j : direction === 'ArrowRight' ? 3 - j : i;
-          if (board[targetR][targetC] !== newRow[j]) moved = true;
-          board[targetR][targetC] = newRow[j];
+        arr = arr.filter(v => v);
+        while (arr.length < size) arr.push(0);
+        return arr;
+      };
+
+      for (let i = 0; i < size; i++) {
+        let row = [];
+        for (let j = 0; j < size; j++) {
+          if (dir === 'left') row.push(newBoard[i][j]);
+          if (dir === 'right') row.push(newBoard[i][3-j]);
+          if (dir === 'up') row.push(newBoard[j][i]);
+          if (dir === 'down') row.push(newBoard[3-j][i]);
+        }
+        row = slide(row);
+        for (let j = 0; j < size; j++) {
+          let r = dir === 'up' ? j : dir === 'down' ? 3-j : i;
+          let c = dir === 'left' ? j : dir === 'right' ? 3-j : i;
+          if (board[r][c] !== row[j]) moved = true;
+          newBoard[r][c] = row[j];
         }
       }
+      
       if (moved) {
-        spawn();
-        render();
+        board = newBoard;
+        moves++;
+        updateDOM();
+        setTimeout(spawn, 150);
       }
     }
 
-    window.addEventListener('keydown', (e) => {
-      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+    function checkGameOver() {
+      for(let i=0; i<size; i++) {
+        for(let j=0; j<size; j++) {
+          if(board[i][j] === 0) return;
+          if(j < size-1 && board[i][j] === board[i][j+1]) return;
+          if(i < size-1 && board[i][j] === board[i+1][j]) return;
+        }
+      }
+      document.getElementById('game-over').classList.add('active');
+    }
+
+    // Keyboard controls
+    document.addEventListener('keydown', e => {
+      if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) {
         e.preventDefault();
-        move(e.key);
+        move(e.key.replace('Arrow', '').toLowerCase());
       }
     });
 
-    spawn();
-    spawn();
-    render();
+    // Mobile Swipe controls
+    let touchX, touchY;
+    document.addEventListener('touchstart', e => { 
+      touchX = e.touches[0].clientX; 
+      touchY = e.touches[0].clientY; 
+    }, {passive: false});
+    
+    document.addEventListener('touchend', e => {
+      if (!touchX || !touchY) return;
+      let dx = e.changedTouches[0].clientX - touchX;
+      let dy = e.changedTouches[0].clientY - touchY;
+      
+      if (Math.abs(dx) > Math.abs(dy)) {
+        if (Math.abs(dx) > 30) move(dx > 0 ? 'right' : 'left');
+      } else {
+        if (Math.abs(dy) > 30) move(dy > 0 ? 'down' : 'up');
+      }
+      touchX = null; touchY = null;
+    });
+
+    // Prevent default scrolling on mobile when trying to play
+    document.getElementById('game-container').addEventListener('touchmove', e => e.preventDefault(), {passive: false});
+
+    init();
   </script>
 </body>
 </html>
