@@ -1,212 +1,287 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark" data-skin="cyber">
+<html lang="en" data-theme="cyber">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>2048 Elite</title>
-<style>
-  :root[data-theme="dark"] { --bg: #0b0f1a; --panel: #161b22; --grid: #21262d; --text: #c9d1d9; --accent: #58a6ff; --err: #f85149; }
-  
-  /* Skin: Cyber (Neon) */
-  [data-skin="cyber"] .tile { border: 1px solid var(--accent); box-shadow: 0 0 15px var(--accent); }
-  [data-skin="cyber"] .v-2 { background: rgba(88, 166, 255, 0.1); color: #fff; }
-  [data-skin="cyber"] .v-2048 { background: #ff00ff; box-shadow: 0 0 30px #ff00ff; color: #fff; }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>2048 // CYBERPUNK_OVERDRIVE</title>
+    <style>
+        :root {
+            --bg: #050505; --panel: #0a0a0f; --grid: #121217; --text: #00f2ff;
+            --accent: #00f2ff; --secondary: #ff0055; --acid: #05ffa1; --cols: 10;
+        }
 
-  /* Skin: Wood (Organic) */
-  [data-skin="wood"] { --bg: #3e2723; --panel: #4e342e; --grid: #5d4037; --accent: #8d6e63; }
-  [data-skin="wood"] .tile { border-radius: 50%; background: #a1887f; color: #3e2723; border: 4px solid #3e2723; }
+        * { box-sizing: border-box; touch-action: none; user-select: none; cursor: crosshair; }
+        body {
+            margin: 0; background: var(--bg); color: var(--text);
+            font-family: 'Courier New', monospace;
+            display: flex; flex-direction: column; align-items: center;
+            min-height: 100vh; overflow: hidden;
+        }
 
-  /* Skin: Retro (8-bit) */
-  [data-skin="retro"] .tile { image-rendering: pixelated; border: 4px solid #000; border-radius: 0; font-family: 'Courier New', monospace; }
+        /* CRT Scanline Effect */
+        body::before {
+            content: " "; display: block; position: absolute; top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 200; background-size: 100% 2px, 3px 100%; pointer-events: none;
+        }
 
-  * { box-sizing: border-box; touch-action: none; user-select: none; }
-  body { margin: 0; padding: 20px; font-family: 'Inter', system-ui; background: var(--bg); color: var(--text); display: flex; justify-content: center; align-items: center; min-height: 100vh; overflow: hidden; }
+        #ui-layer {
+            display: flex; gap: 20px; padding: 20px; width: 100%; max-width: 1200px;
+            z-index: 10; justify-content: center;
+        }
 
-  #app { display: grid; grid-template-columns: 320px 1fr; gap: 40px; max-width: 1100px; width: 100%; }
-  @media (max-width: 900px) { #app { grid-template-columns: 1fr; } }
+        .card {
+            background: var(--panel); padding: 15px; border-radius: 0;
+            box-shadow: 0 0 20px rgba(0, 242, 255, 0.2); border: 2px solid var(--accent);
+            display: flex; flex-direction: column; gap: 10px; position: relative;
+        }
 
-  .side-panel { display: flex; flex-direction: column; gap: 20px; }
-  .card { background: var(--panel); padding: 20px; border-radius: 12px; border: 1px solid var(--grid); }
-  
-  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .stat-item { background: var(--bg); padding: 10px; border-radius: 8px; text-align: center; }
-  .stat-item label { display: block; font-size: 0.7rem; text-transform: uppercase; opacity: 0.6; }
-  .stat-item span { font-size: 1.2rem; font-weight: bold; }
+        .card::after { content: "SYSTEM_ACTIVE"; position: absolute; bottom: -18px; right: 5px; font-size: 0.6rem; color: var(--secondary); }
 
-  #game-container { position: relative; width: 500px; height: 500px; background: var(--grid); padding: 10px; border-radius: 12px; }
-  @media (max-width: 600px) { #game-container { width: 90vw; height: 90vw; } }
-  
-  .grid-bg { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; height: 100%; }
-  .cell { background: rgba(0,0,0,0.2); border-radius: 8px; }
+        .stat-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .stat-box { border: 1px solid var(--grid); padding: 8px; text-align: center; }
+        .stat-box small { font-size: 0.6rem; color: var(--secondary); text-transform: uppercase; letter-spacing: 2px; }
+        .stat-box div { font-weight: bold; font-size: 1.2rem; text-shadow: 0 0 5px var(--accent); }
 
-  .tile { position: absolute; width: calc(25% - 12.5px); height: calc(25% - 12.5px); display: flex; justify-content: center; align-items: center; font-size: 2rem; font-weight: 900; transition: transform 100ms ease-in-out; border-radius: 8px; }
-  .ghost-tile { opacity: 0.2; border: 2px dashed var(--accent); background: none !important; color: transparent !important; z-index: 1; }
-  
-  button { width: 100%; padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; background: var(--accent); color: #fff; margin-top: 10px; }
-  select { width: 100%; padding: 12px; background: var(--grid); color: var(--text); border: 1px solid var(--accent); border-radius: 8px; margin-top: 10px; }
+        #game-view { position: relative; perspective: 1200px; width: min(90vw, 600px); height: min(90vw, 600px); }
 
-  #achievements { max-height: 200px; overflow-y: auto; font-size: 0.8rem; }
-  .achievement { padding: 5px; border-bottom: 1px solid var(--grid); display: flex; justify-content: space-between; }
-  .unlocked { color: #44ff44; }
+        #board {
+            position: absolute; inset: 0; background: var(--grid); border: 2px solid var(--grid);
+            display: grid; grid-template-columns: repeat(var(--cols), 1fr); gap: 4px;
+            padding: 4px; transform-style: preserve-3d; transition: transform 0.1s ease-out;
+            box-shadow: 0 0 40px rgba(0,0,0,1);
+        }
 
-  .v-2{background:#eee4da;color:#000}.v-4{background:#ede0c8;color:#000}.v-8{background:#f2b179;color:#fff}.v-16{background:#f59563;color:#fff}.v-32{background:#f67c5f;color:#fff}.v-64{background:#f65e3b;color:#fff}.v-128{background:#edcf72;color:#000}.v-256{background:#edcc61;color:#000}.v-512{background:#edc850;color:#fff}.v-1024{background:#edc53f;color:#fff}.v-2048{background:#edc22e;color:#fff}
-</style>
+        .cell { border: 1px solid rgba(0, 242, 255, 0.05); }
+        
+        .tile {
+            position: absolute; width: calc((100% - (var(--cols) + 1) * 4px) / var(--cols));
+            height: calc((100% - (var(--cols) + 1) * 4px) / var(--cols));
+            display: flex; justify-content: center; align-items: center;
+            font-weight: 900; font-size: clamp(0.6rem, 1.5vw, 1.1rem);
+            transition: transform 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275), background 0.3s;
+            z-index: 2; border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        /* Neon Palette */
+        .v-2 { background: rgba(0, 242, 255, 0.05); color: #444; border-color: #222; }
+        .v-4 { background: rgba(0, 242, 255, 0.1); color: #666; }
+        .v-8 { background: rgba(255, 0, 85, 0.2); color: var(--secondary); border-color: var(--secondary); box-shadow: inset 0 0 10px var(--secondary); }
+        .v-16 { background: rgba(255, 0, 85, 0.4); color: #fff; text-shadow: 0 0 5px #fff; }
+        .v-32 { background: var(--secondary); color: #fff; box-shadow: 0 0 15px var(--secondary); }
+        .v-64 { background: var(--acid); color: #000; box-shadow: 0 0 20px var(--acid); }
+        .v-128 { background: #fff; color: #000; box-shadow: 0 0 25px #fff; }
+
+        #particle-canvas { position: fixed; inset: 0; pointer-events: none; z-index: 100; }
+
+        button {
+            background: transparent; color: var(--accent); border: 1px solid var(--accent); padding: 10px;
+            font-family: inherit; font-weight: bold; cursor: pointer; transition: 0.2s;
+            clip-path: polygon(0 0, 100% 0, 100% 70%, 90% 100%, 0 100%);
+        }
+        button:hover { background: var(--accent); color: #000; box-shadow: 0 0 15px var(--accent); }
+
+        .glitch { animation: glitch 0.5s infinite; }
+        @keyframes glitch {
+            0% { transform: translate(0); text-shadow: -2px 0 var(--secondary), 2px 0 var(--accent); }
+            20% { transform: translate(-2px, 2px); }
+            40% { transform: translate(-2px, -2px); text-shadow: 2px 0 var(--secondary), -2px 0 var(--accent); }
+            60% { transform: translate(2px, 2px); }
+            80% { transform: translate(2px, -2px); }
+            100% { transform: translate(0); }
+        }
+
+        #achievements { font-size: 0.6rem; color: #444; margin-top: 5px; }
+        .earned { color: var(--acid) !important; text-shadow: 0 0 5px var(--acid); }
+    </style>
 </head>
 <body>
 
-<div id="app">
-  <div class="side-panel">
-    <div class="card">
-      <div class="stat-grid">
-        <div class="stat-item"><label>Score</label><span id="score">0</span></div>
-        <div class="stat-item"><label>Best</label><span id="best">0</span></div>
-        <div class="stat-item"><label>Moves</label><span id="moves">0</span></div>
-        <div class="stat-item"><label>Rank</label><span id="rank">Novice</span></div>
-      </div>
-      <select id="skin-select" onchange="changeSkin()">
-        <option value="cyber">Cyber Neon</option>
-        <option value="wood">Rustic Wood</option>
-        <option value="retro">8-Bit Retro</option>
-      </select>
-      <button onclick="restart()">New Game</button>
-      <button onclick="undo()" id="undo-btn">Undo (3)</button>
-    </div>
+<canvas id="particle-canvas"></canvas>
 
+<div id="ui-layer">
     <div class="card">
-      <label style="font-size: 0.8rem; font-weight: bold; color: var(--accent);">🏆 Achievements</label>
-      <div id="achievements"></div>
+        <h2 class="glitch" style="margin:0; font-size: 1.2rem; letter-spacing: 4px;">// 2048_OVERDRIVE</h2>
+        <div class="stat-group">
+            <div class="stat-box"><small>Data_Score</small><div id="score">0</div></div>
+            <div class="stat-box"><small>Core_Best</small><div id="best">0</div></div>
+        </div>
+        <div class="stat-group">
+            <button onclick="undo()">REV_STEP</button>
+            <button onclick="init()" style="border-color:var(--secondary); color:var(--secondary);">HARD_RST</button>
+        </div>
+        <div id="achievements">
+            STATUS: <br>
+            <span id="ach-1">• [SYNC_128_TILE]</span><br>
+            <span id="ach-2">• [THOUSAND_MOVES]</span>
+        </div>
     </div>
-  </div>
+</div>
 
-  <div id="game-container">
-    <div class="grid-bg">
-      <script>for(let i=0;i<16;i++) document.write('<div class="cell"></div>');</script>
-    </div>
-    <div id="tiles-layer"></div>
-  </div>
+<div id="game-view">
+    <div id="board"></div>
 </div>
 
 <script>
-  let grid = Array(16).fill(0), score = 0, moves = 0, tileId = 0, bestScore = localStorage.getItem('2048-elite-best') || 0;
-  let history = [], undos = 3, ghostData = JSON.parse(localStorage.getItem('2048-ghost-run')) || null;
-  const achievements = JSON.parse(localStorage.getItem('2048-achievements')) || {};
-
-  function changeSkin() {
-    document.documentElement.setAttribute('data-skin', document.getElementById('skin-select').value);
-  }
-
-  function saveGhost() {
-    if (score >= bestScore) {
-      localStorage.setItem('2048-ghost-run', JSON.stringify({ moves: moves, score: score, sequence: history.map(h => h.grid) }));
-    }
-  }
-
-  function checkAchievements() {
-    const list = document.getElementById('achievements');
-    const goals = { 
-      'First Merge': score > 0, 
-      'Century': score >= 100, 
-      'Tactician': moves > 50, 
-      'Elite': grid.includes(1024), 
-      'God': grid.includes(2048) 
-    };
-    list.innerHTML = '';
-    for (let [name, met] of Object.entries(goals)) {
-      if (met) achievements[name] = true;
-      list.innerHTML += `<div class="achievement ${achievements[name] ? 'unlocked' : ''}"><span>${name}</span> <span>${achievements[name] ? '✓' : '×'}</span></div>`;
-    }
-    localStorage.setItem('2048-achievements', JSON.stringify(achievements));
-  }
-
-  function getPos(idx) {
-    let x = idx % 4, y = Math.floor(idx / 4);
-    return `translate(calc(${x * 100}% + ${x * 10}px), calc(${y * 100}% + ${y * 10}px))`;
-  }
-
-  function updateDOM() {
-    const layer = document.getElementById('tiles-layer');
-    layer.innerHTML = '';
+    const SIZE = 10;
+    const TOTAL = 100;
+    let grid = Array(TOTAL).fill(null), score = 0, moves = 0, tileId = 0;
+    let history = [], best = localStorage.getItem('2048-cyber-best') || 0;
     
-    // Ghost Logic: Show where your high score was at this move count
-    if (ghostData && ghostData.sequence[moves]) {
-      ghostData.sequence[moves].forEach((val, i) => {
-        if (val > 0) {
-          let ghost = document.createElement('div');
-          ghost.className = 'tile ghost-tile';
-          ghost.style.transform = getPos(i);
-          layer.appendChild(ghost);
-        }
-      });
+    // --- Industrial Audio Engine ---
+    let audioCtx = null;
+    const tones = { 'U': 110, 'D': 82.41, 'L': 73.42, 'R': 98.00 }; // Deep Sub Tones
+    
+    function initAudio() {
+        if (audioCtx) return;
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     }
 
-    grid.forEach((val, i) => {
-      if (val > 0) {
-        let t = document.createElement('div');
-        t.className = `tile v-${val > 2048 ? 2048 : val}`;
-        t.innerText = val;
-        t.style.transform = getPos(i);
-        layer.appendChild(t);
-      }
+    function playSound(freq, type = 'sawtooth', duration = 0.15, vol = 0.05) {
+        if (!audioCtx) return;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        // Add a bit of distortion flavor
+        gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+        gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+    }
+
+    // --- Particle Burst ---
+    const canvas = document.getElementById('particle-canvas');
+    const ctx = canvas.getContext('2d');
+    let particles = [];
+    window.onresize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
+    window.onresize();
+
+    function createExplosion(x, y, color) {
+        for(let i=0; i<20; i++) {
+            particles.push({
+                x, y, color,
+                w: Math.random() * 8 + 2, h: 2,
+                vx: (Math.random() - 0.5) * 15,
+                vy: (Math.random() - 0.5) * 15,
+                life: 1
+            });
+        }
+    }
+
+    function updateParticles() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        particles.forEach((p, i) => {
+            p.x += p.vx; p.y += p.vy; p.life -= 0.03;
+            ctx.fillStyle = p.color;
+            ctx.fillRect(p.x, p.y, p.w, p.h);
+            if(p.life <= 0) particles.splice(i, 1);
+        });
+        requestAnimationFrame(updateParticles);
+    }
+    updateParticles();
+
+    // --- Game Logic ---
+    function init() {
+        grid.fill(null); score = 0; moves = 0;
+        document.getElementById('board').innerHTML = '';
+        for(let i=0; i<TOTAL; i++) {
+            let c = document.createElement('div'); c.className = 'cell';
+            document.getElementById('board').appendChild(c);
+        }
+        spawn(); spawn(); updateDOM();
+    }
+
+    function spawn() {
+        let empty = grid.map((v, i) => v === null ? i : -1).filter(i => i !== -1);
+        if (empty.length) {
+            grid[empty[Math.floor(Math.random() * empty.length)]] = { id: tileId++, val: 2 };
+        }
+    }
+
+    function updateDOM() {
+        document.getElementById('score').innerText = score;
+        document.getElementById('best').innerText = best;
+        const board = document.getElementById('board');
+        const gap = 4;
+        const tileSize = (board.clientWidth - (SIZE + 1) * gap) / SIZE;
+
+        grid.forEach((t, i) => {
+            if (!t) return;
+            let el = document.getElementById('t' + t.id);
+            if (!el) {
+                el = document.createElement('div');
+                el.id = 't' + t.id; el.className = 'tile';
+                board.appendChild(el);
+            }
+            el.className = `tile v-${t.val > 128 ? 128 : t.val}`;
+            el.innerText = t.val;
+            let x = i % SIZE, y = Math.floor(i / SIZE);
+            el.style.transform = `translate(${x * (tileSize + gap) + gap}px, ${y * (tileSize + gap) + gap}px)`;
+        });
+
+        const ids = new Set(grid.filter(t => t).map(t => 't' + t.id));
+        board.querySelectorAll('.tile').forEach(el => { if(!ids.has(el.id)) el.remove(); });
+        
+        if (score > best) { best = score; localStorage.setItem('2048-cyber-best', best); }
+        if (grid.some(t => t && t.val >= 128)) document.getElementById('ach-1').classList.add('earned');
+    }
+
+    function move(dir) {
+        initAudio();
+        playSound(tones[dir], 'sawtooth', 0.1, 0.03);
+        
+        let moved = false;
+        history.push({ grid: JSON.stringify(grid), score });
+        if(history.length > 5) history.shift();
+
+        for(let i = 0; i < SIZE; i++) {
+            let row = [];
+            for(let j = 0; j < SIZE; j++) {
+                let idx = dir === 'L' ? i*SIZE+j : dir === 'R' ? i*SIZE+(SIZE-1-j) : dir === 'U' ? j*SIZE+i : (SIZE-1-j)*SIZE+i;
+                if(grid[idx]) row.push(grid[idx]);
+            }
+            let nr = [];
+            for(let k = 0; k < row.length; k++) {
+                if(row[k+1] && row[k].val === row[k+1].val) {
+                    let newVal = row[k].val * 2;
+                    nr.push({ id: row[k].id, val: newVal });
+                    score += newVal; k++; moved = true;
+                    playSound(50 + (newVal), 'square', 0.2, 0.05);
+                    const rect = document.getElementById('board').getBoundingClientRect();
+                    createExplosion(rect.width/2, rect.height/2, newVal >= 32 ? 'var(--secondary)' : 'var(--accent)');
+                } else { nr.push(row[k]); }
+            }
+            while(nr.length < SIZE) nr.push(null);
+            for(let j = 0; j < SIZE; j++) {
+                let idx = dir === 'L' ? i*SIZE+j : dir === 'R' ? i*SIZE+(SIZE-1-j) : dir === 'U' ? j*SIZE+i : (SIZE-1-j)*SIZE+i;
+                if(JSON.stringify(grid[idx]) !== JSON.stringify(nr[j])) moved = true;
+                grid[idx] = nr[j];
+            }
+        }
+        if(moved) { moves++; spawn(); updateDOM(); } else { history.pop(); }
+    }
+
+    function undo() {
+        if(!history.length) return;
+        let last = history.pop();
+        grid = JSON.parse(last.grid); score = last.score; updateDOM();
+    }
+
+    window.addEventListener('keydown', e => {
+        if(e.key === 'ArrowUp') move('U'); if(e.key === 'ArrowDown') move('D');
+        if(e.key === 'ArrowLeft') move('L'); if(e.key === 'ArrowRight') move('R');
     });
 
-    document.getElementById('score').innerText = score;
-    document.getElementById('moves').innerText = moves;
-    document.getElementById('best').innerText = bestScore;
-    document.getElementById('rank').innerText = score > 5000 ? 'Master' : score > 1000 ? 'Pro' : 'Novice';
-    checkAchievements();
-  }
+    document.addEventListener('mousemove', e => {
+        let x = (e.clientX / window.innerWidth - 0.5) * 10;
+        let y = (e.clientY / window.innerHeight - 0.5) * -10;
+        document.getElementById('board').style.transform = `rotateX(${y}deg) rotateY(${x}deg)`;
+    });
 
-  function spawn() {
-    let empty = grid.map((v, i) => v === 0 ? i : -1).filter(i => i !== -1);
-    if (empty.length) grid[empty[Math.floor(Math.random() * empty.length)]] = Math.random() > 0.1 ? 2 : 4;
-  }
-
-  function move(dir) {
-    let oldGrid = [...grid], oldScore = score, moved = false;
-    history.push({ grid: oldGrid, score: oldScore });
-
-    for (let i = 0; i < 4; i++) {
-      let row = [];
-      for (let j = 0; j < 4; j++) {
-        let idx = dir === 'L' ? i*4+j : dir === 'R' ? i*4+(3-j) : dir === 'U' ? j*4+i : (3-j)*4+i;
-        if (grid[idx]) row.push(grid[idx]);
-      }
-      let nr = [];
-      for (let k = 0; k < row.length; k++) {
-        if (row[k] === row[k+1]) { nr.push(row[k]*2); score += row[k]*2; k++; moved = true; }
-        else { nr.push(row[k]); }
-      }
-      while (nr.length < 4) nr.push(0);
-      for (let j = 0; j < 4; j++) {
-        let idx = dir === 'L' ? i*4+j : dir === 'R' ? i*4+(3-j) : dir === 'U' ? j*4+i : (3-j)*4+i;
-        if (grid[idx] !== nr[j]) moved = true;
-        grid[idx] = nr[j];
-      }
-    }
-
-    if (moved) { moves++; spawn(); updateDOM(); } else { history.pop(); }
-    if (score > bestScore) { bestScore = score; localStorage.setItem('2048-elite-best', bestScore); saveGhost(); }
-  }
-
-  function undo() {
-    if (history.length && undos > 0) {
-      let prev = history.pop();
-      grid = prev.grid; score = prev.score; moves--; undos--;
-      document.getElementById('undo-btn').innerText = `Undo (${undos})`;
-      updateDOM();
-    }
-  }
-
-  function restart() {
-    if (confirm("Restart game?")) { grid.fill(0); score = 0; moves = 0; history = []; undos = 3; spawn(); spawn(); updateDOM(); }
-  }
-
-  window.addEventListener('keydown', e => {
-    if (e.key === 'ArrowUp') move('U'); if (e.key === 'ArrowDown') move('D');
-    if (e.key === 'ArrowLeft') move('L'); if (e.key === 'ArrowRight') move('R');
-  });
-
-  spawn(); spawn(); updateDOM();
+    init();
 </script>
 </body>
 </html>
