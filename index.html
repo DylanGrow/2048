@@ -32,7 +32,7 @@
   #board.danger { animation: heartbeat 1s infinite; }
   
   .cell { background: rgba(0,0,0,0.1); border-radius: 8px; }
-  .tile { position: absolute; width: calc(25% - 12.5px); height: calc(25% - 12.5px); border-radius: 8px; display: flex; justify-content: center; align-items: center; font-size: clamp(1.5rem, 5vw, 2.5rem); font-weight: 800; transition: transform 0.15s cubic-bezier(0.2,0.8,0.2,1); box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+  .tile { position: absolute; width: calc(25% - 12.5px); height: calc(25% - 12.5px); border-radius: 8px; display: flex; justify-content: center; align-items: center; font-size: clamp(1.5rem, 5vw, 2.5rem); font-weight: 800; transition: transform 0.15s cubic-bezier(0.2,0.8,0.2,1); box-shadow: 0 4px 10px rgba(0,0,0,0.2); z-index: 2; }
   .new { animation: pop 0.2s forwards; }
   .merged { animation: pop-merge 0.2s forwards; z-index: 10; }
   
@@ -41,7 +41,6 @@
   #overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(5px); border-radius: 16px; display: flex; flex-direction: column; justify-content: center; align-items: center; opacity: 0; pointer-events: none; transition: opacity 0.3s; z-index: 20; text-align: center; }
   #overlay.active { opacity: 1; pointer-events: auto; }
   
-  .particle { position: absolute; pointer-events: none; border-radius: 50%; z-index: 30; }
   #ai-msg { font-size: 0.9rem; margin-top: 10px; min-height: 40px; color: var(--accent); }
   
   @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-5px)} 75%{transform:translateX(5px)} }
@@ -68,8 +67,8 @@
       <button class="alt" onclick="toggleMute()" id="mute-btn">🔊 Sound</button>
     </div>
     <hr style="border:1px solid var(--grid); margin:15px 0;">
-    <button onclick="aiHint()">🤖 Get AI Hint</button>
-    <div id="ai-msg">Ready to play. Daily seed active.</div>
+    <button onclick="aiHint()">🤖 Pro AI Analyst</button>
+    <div id="ai-msg">Ready to play. Smooth engine active.</div>
   </div>
 
   <div id="game-wrapper">
@@ -85,14 +84,28 @@
 </div>
 
 <script>
-  let grid = Array(16).fill(0), score = 0, best = localStorage.getItem('2048-best') || 0;
-  let undoStack = [], undosLeft = 3, isGameOver = false, isMuted = false, lock = false;
+  let grid = Array(16).fill(null), score = 0, best = localStorage.getItem('2048-best') || 0;
+  let undoStack = [], undosLeft = 3, isGameOver = false, isMuted = false, lock = false, tileId = 0;
   
+  // Audio Engine with Autoplay Bypass
   const AudioCtx = window.AudioContext || window.webkitAudioContext;
-  let actx = null;
+  let actx = null, audioUnlocked = false;
+
+  function unlockAudio() {
+    if (audioUnlocked) return;
+    if (!actx) actx = new AudioCtx();
+    if (actx.state === 'suspended') actx.resume();
+    let osc = actx.createOscillator(), gain = actx.createGain();
+    gain.gain.value = 0; 
+    osc.connect(gain); gain.connect(actx.destination);
+    osc.start(0); osc.stop(actx.currentTime + 0.001);
+    audioUnlocked = true;
+    ['touchstart', 'keydown', 'mousedown'].forEach(e => document.removeEventListener(e, unlockAudio));
+  }
+  ['touchstart', 'keydown', 'mousedown'].forEach(e => document.addEventListener(e, unlockAudio, {once:true}));
+
   function playSound(type, val = 0) {
-    if(isMuted) return;
-    if(!actx) actx = new AudioCtx();
+    if(isMuted || !audioUnlocked) return;
     if(actx.state === 'suspended') actx.resume();
     const osc = actx.createOscillator(), g = actx.createGain();
     osc.connect(g); g.connect(actx.destination);
@@ -119,14 +132,15 @@
 
   function init() {
     document.getElementById('best').innerText = best;
-    grid.fill(0); score = 0; undoStack = []; undosLeft = 3; isGameOver = false; lock = false;
+    grid.fill(null); score = 0; undoStack = []; undosLeft = 3; isGameOver = false; lock = false;
     document.getElementById('overlay').classList.remove('active');
+    document.getElementById('board').querySelectorAll('.tile').forEach(el => el.remove());
     spawn(); spawn(); updateDOM();
   }
 
   function spawn() {
-    let empty = grid.map((v, i) => v === 0 ? i : -1).filter(i => i !== -1);
-    if(empty.length) grid[empty[Math.floor(random() * empty.length)]] = random() > 0.1 ? 2 : 4;
+    let empty = grid.map((v, i) => v === null ? i : -1).filter(i => i !== -1);
+    if(empty.length) grid[empty[Math.floor(random() * empty.length)]] = { id: tileId++, val: random() > 0.1 ? 2 : 4, merged: false };
   }
 
   function getPos(idx) {
@@ -134,48 +148,65 @@
     return `translate(calc(${x * 100}% + ${x * 10}px), calc(${y * 100}% + ${y * 10}px))`;
   }
 
-  function updateDOM(animData = {}) {
+  // Engine Fix 1: Object Diffing for real CSS Transitions
+  function updateDOM() {
     document.getElementById('score').innerText = score;
     if(score > best) { best = score; localStorage.setItem('2048-best', best); document.getElementById('best').innerText = best; }
     
     let board = document.getElementById('board');
-    board.querySelectorAll('.tile').forEach(el => el.remove());
+    let currentIds = new Set();
     
-    let emptyCount = 0;
-    grid.forEach((val, i) => {
-      if(val === 0) { emptyCount++; return; }
-      let el = document.createElement('div');
-      el.className = `tile v-${val > 2048 ? 2048 : val} ${animData[i] || ''}`;
-      el.innerText = val;
+    grid.forEach((t, i) => {
+      if(!t) return;
+      currentIds.add(t.id);
+      let el = document.getElementById('t' + t.id);
+      
+      if(!el) {
+        el = document.createElement('div');
+        el.id = 't' + t.id;
+        el.className = `tile v-${t.val > 2048 ? 2048 : t.val} new`;
+        board.appendChild(el);
+      } else {
+        el.className = `tile v-${t.val > 2048 ? 2048 : t.val} ${t.merged ? 'merged' : ''}`;
+      }
+      
+      el.innerText = t.val;
       el.style.transform = getPos(i);
-      board.appendChild(el);
     });
 
-    board.className = emptyCount <= 2 && !isGameOver ? 'danger' : '';
+    board.querySelectorAll('.tile').forEach(el => {
+      if(!currentIds.has(parseInt(el.id.substring(1)))) el.remove();
+    });
+
+    board.className = grid.filter(t => !t).length <= 2 && !isGameOver ? 'danger' : '';
     checkGameOver();
   }
 
   function move(dir) {
     if(isGameOver || lock) return;
-    lock = true; // Engage lock properly here
-    let oldGrid = [...grid], oldScore = score, moved = false, merges = {};
+    lock = true; 
+    let oldGrid = grid.map(t => t ? {...t} : null), oldScore = score, moved = false;
     
+    grid.forEach(t => t && (t.merged = false)); // Reset merge flags
+
     for(let i = 0; i < 4; i++) {
-      let row = [], idxs = [];
+      let row = [];
       for(let j = 0; j < 4; j++) {
         let realIdx = dir === 'L' ? i*4+j : dir === 'R' ? i*4+(3-j) : dir === 'U' ? j*4+i : (3-j)*4+i;
-        if(grid[realIdx]) { row.push(grid[realIdx]); idxs.push(realIdx); }
+        if(grid[realIdx]) row.push(grid[realIdx]);
       }
       
       let newRow = [];
       for(let k = 0; k < row.length; k++) {
-        if(row[k] === row[k+1]) {
-          newRow.push(row[k]*2); score += row[k]*2; k++; moved = true;
-          merges[newRow.length-1] = 'merged';
-          playSound('merge', row[k-1]*2);
-        } else { newRow.push(row[k]); }
+        if(row[k+1] && row[k].val === row[k+1].val) {
+          newRow.push({ id: row[k].id, val: row[k].val * 2, merged: true });
+          score += row[k].val * 2; k++; moved = true;
+          playSound('merge', row[k].val * 2);
+        } else { 
+          newRow.push(row[k]); 
+        }
       }
-      while(newRow.length < 4) newRow.push(0);
+      while(newRow.length < 4) newRow.push(null);
       
       for(let j = 0; j < 4; j++) {
         let realIdx = dir === 'L' ? i*4+j : dir === 'R' ? i*4+(3-j) : dir === 'U' ? j*4+i : (3-j)*4+i;
@@ -187,14 +218,12 @@
     if(moved) {
       if(undoStack.length >= 3) undoStack.shift();
       undoStack.push({g: oldGrid, s: oldScore});
-      playSound('slide'); spawn();
-      let anims = {}; grid.forEach((v,i) => { if(oldGrid[i]===0 && v>0) anims[i]='new'; });
-      updateDOM(anims);
+      playSound('slide'); spawn(); updateDOM();
     } else {
       errBump();
     }
     
-    setTimeout(() => lock = false, 150); // Release lock after animation finishes
+    setTimeout(() => lock = false, 150); 
   }
 
   function undo() {
@@ -205,9 +234,9 @@
   }
 
   function checkGameOver() {
-    if(grid.includes(0)) return;
+    if(grid.includes(null)) return;
     for(let i=0; i<16; i++) {
-      if((i%4<3 && grid[i]===grid[i+1]) || (i<12 && grid[i]===grid[i+4])) return;
+      if((i%4<3 && grid[i].val===grid[i+1].val) || (i<12 && grid[i].val===grid[i+4].val)) return;
     }
     isGameOver = true; document.getElementById('overlay').classList.add('active');
   }
@@ -220,21 +249,37 @@
 
   function restart() { if(confirm("Restart current game?")) init(); }
 
+  // Engine Fix 2: Pro AI with Snake Weight Matrix
+  const AI_WEIGHTS = [
+    65536, 32768, 16384, 8192,
+    512,   1024,  2048,  4096,
+    256,   128,   64,    32,
+    2,     4,     8,     16
+  ];
+
   function aiHint() {
     if(isGameOver) return;
-    let scores = {U:0, D:0, L:0, R:0};
+    let scores = {U:-1, D:-1, L:-1, R:-1};
+    
     ['U','D','L','R'].forEach(dir => {
-      let sim = [...grid], moved = false;
+      let sim = grid.map(t => t ? {...t} : null), moved = false;
       for(let i=0;i<4;i++){
         let r=[]; for(let j=0;j<4;j++){let x=dir==='L'?i*4+j:dir==='R'?i*4+(3-j):dir==='U'?j*4+i:(3-j)*4+i; if(sim[x])r.push(sim[x]);}
-        let nr=[]; for(let k=0;k<r.length;k++){if(r[k]===r[k+1]){nr.push(r[k]*2);scores[dir]+=r[k]*2;k++;moved=true;}else nr.push(r[k]);}
-        while(nr.length<4) nr.push(0);
+        let nr=[]; for(let k=0;k<r.length;k++){if(r[k+1]&&r[k].val===r[k+1].val){nr.push({val:r[k].val*2});k++;moved=true;}else nr.push(r[k]);}
+        while(nr.length<4) nr.push(null);
         for(let j=0;j<4;j++){let x=dir==='L'?i*4+j:dir==='R'?i*4+(3-j):dir==='U'?j*4+i:(3-j)*4+i; if(sim[x]!==nr[j]) moved=true; sim[x]=nr[j];}
       }
-      if(!moved) scores[dir] = -1; else scores[dir] += sim.filter(v=>v===0).length * 10;
+      if(moved) {
+        scores[dir] = 0;
+        sim.forEach((t, idx) => {
+          if(t) scores[dir] += t.val * AI_WEIGHTS[idx];
+          else scores[dir] += 100000; // Big bonus for empty slots
+        });
+      }
     });
+    
     let best = Object.keys(scores).reduce((a,b) => scores[a]>scores[b]?a:b);
-    document.getElementById('ai-msg').innerHTML = scores[best] === -1 ? "Board locked." : `Optimal move: <strong>${best === 'U'?'UP':best==='D'?'DOWN':best==='L'?'LEFT':'RIGHT'}</strong>`;
+    document.getElementById('ai-msg').innerHTML = scores[best] === -1 ? "Board locked." : `Optimal strategy: Swipe <strong>${best === 'U'?'UP':best==='D'?'DOWN':best==='L'?'LEFT':'RIGHT'}</strong>`;
   }
 
   function toggleTheme() {
@@ -243,7 +288,6 @@
   }
   function toggleMute() { isMuted = !isMuted; document.getElementById('mute-btn').innerText = isMuted ? '🔇 Muted' : '🔊 Sound'; }
 
-  // Fixed Keyboard Listener
   window.addEventListener('keydown', e => {
     let k = e.key.toLowerCase(); 
     if(['arrowup','w'].includes(k)) { e.preventDefault(); move('U'); }
@@ -268,9 +312,6 @@
     let rx = (e.clientY / window.innerHeight - 0.5) * -10, ry = (e.clientX / window.innerWidth - 0.5) * 10;
     document.getElementById('game-wrapper').style.transform = `rotateX(${rx}deg) rotateY(${ry}deg)`;
   });
-
-  window.addEventListener('blur', () => { if(actx) actx.suspend(); });
-  window.addEventListener('focus', () => { if(actx && !isMuted) actx.resume(); });
 
   init();
 </script>
