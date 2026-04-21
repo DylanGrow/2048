@@ -85,16 +85,15 @@
 </div>
 
 <script>
-  // Core State
   let grid = Array(16).fill(0), score = 0, best = localStorage.getItem('2048-best') || 0;
   let undoStack = [], undosLeft = 3, isGameOver = false, isMuted = false, lock = false;
   
-  // Audio Synth Context
   const AudioCtx = window.AudioContext || window.webkitAudioContext;
   let actx = null;
   function playSound(type, val = 0) {
     if(isMuted) return;
     if(!actx) actx = new AudioCtx();
+    if(actx.state === 'suspended') actx.resume();
     const osc = actx.createOscillator(), g = actx.createGain();
     osc.connect(g); g.connect(actx.destination);
     
@@ -115,13 +114,12 @@
     }
   }
 
-  // Daily Seeded RNG
   let seed = new Date().setHours(0,0,0,0);
   function random() { let x = Math.sin(seed++) * 10000; return x - Math.floor(x); }
 
   function init() {
     document.getElementById('best').innerText = best;
-    grid.fill(0); score = 0; undoStack = []; undosLeft = 3; isGameOver = false;
+    grid.fill(0); score = 0; undoStack = []; undosLeft = 3; isGameOver = false; lock = false;
     document.getElementById('overlay').classList.remove('active');
     spawn(); spawn(); updateDOM();
   }
@@ -157,9 +155,9 @@
     checkGameOver();
   }
 
-  // Mechanics Logic
   function move(dir) {
     if(isGameOver || lock) return;
+    lock = true; // Engage lock properly here
     let oldGrid = [...grid], oldScore = score, moved = false, merges = {};
     
     for(let i = 0; i < 4; i++) {
@@ -195,6 +193,8 @@
     } else {
       errBump();
     }
+    
+    setTimeout(() => lock = false, 150); // Release lock after animation finishes
   }
 
   function undo() {
@@ -220,7 +220,6 @@
 
   function restart() { if(confirm("Restart current game?")) init(); }
 
-  // Simple Heuristic AI Hint
   function aiHint() {
     if(isGameOver) return;
     let scores = {U:0, D:0, L:0, R:0};
@@ -238,21 +237,19 @@
     document.getElementById('ai-msg').innerHTML = scores[best] === -1 ? "Board locked." : `Optimal move: <strong>${best === 'U'?'UP':best==='D'?'DOWN':best==='L'?'LEFT':'RIGHT'}</strong>`;
   }
 
-  // Theming & Audio Toggle
   function toggleTheme() {
     let t = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', t);
   }
   function toggleMute() { isMuted = !isMuted; document.getElementById('mute-btn').innerText = isMuted ? '🔇 Muted' : '🔊 Sound'; }
 
-  // Inputs
+  // Fixed Keyboard Listener
   window.addEventListener('keydown', e => {
-    let k = e.key.toLowerCase(); lock = true;
-    if(['arrowup','w'].includes(k)) move('U');
-    if(['arrowdown','s'].includes(k)) move('D');
-    if(['arrowleft','a'].includes(k)) move('L');
-    if(['arrowright','d'].includes(k)) move('R');
-    setTimeout(() => lock = false, 50); // Debounce
+    let k = e.key.toLowerCase(); 
+    if(['arrowup','w'].includes(k)) { e.preventDefault(); move('U'); }
+    if(['arrowdown','s'].includes(k)) { e.preventDefault(); move('D'); }
+    if(['arrowleft','a'].includes(k)) { e.preventDefault(); move('L'); }
+    if(['arrowright','d'].includes(k)) { e.preventDefault(); move('R'); }
   });
 
   let tx, ty, time;
@@ -261,13 +258,12 @@
     if(!tx||!ty) return;
     let dx = e.changedTouches[0].clientX - tx, dy = e.changedTouches[0].clientY - ty;
     let v = Math.max(Math.abs(dx), Math.abs(dy)) / (Date.now() - time);
-    if(v > 0.5 || Math.max(Math.abs(dx), Math.abs(dy)) > 40) { // Velocity + Deadzone
+    if(v > 0.5 || Math.max(Math.abs(dx), Math.abs(dy)) > 40) { 
       if(Math.abs(dx) > Math.abs(dy)) move(dx > 0 ? 'R' : 'L'); else move(dy > 0 ? 'D' : 'U');
     }
     tx=ty=null;
   });
 
-  // Parallax 3D Effect
   document.addEventListener('mousemove', e => {
     let rx = (e.clientY / window.innerHeight - 0.5) * -10, ry = (e.clientX / window.innerWidth - 0.5) * 10;
     document.getElementById('game-wrapper').style.transform = `rotateX(${rx}deg) rotateY(${ry}deg)`;
