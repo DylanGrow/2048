@@ -1,246 +1,245 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="cyber">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>2048 // CYBERPUNK_OVERDRIVE</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>2048 // CYBER_FLUX_ULTIMATE</title>
     <style>
         :root {
-            --bg: #050505; --panel: #0a0a0f; --grid: #121217; --text: #00f2ff;
-            --accent: #00f2ff; --secondary: #ff0055; --acid: #05ffa1; --cols: 10;
+            --bg: #0d1117; --panel: #161b22; --grid: #21262d; --text: #58a6ff;
+            --accent: #00f2ff; --secondary: #ff0055; --acid: #a3be8c; --cols: 4;
+            --board-size: min(88vw, 60vh);
         }
 
-        * { box-sizing: border-box; touch-action: none; user-select: none; cursor: crosshair; }
+        * { box-sizing: border-box; touch-action: none; user-select: none; }
         body {
             margin: 0; background: var(--bg); color: var(--text);
-            font-family: 'Courier New', monospace;
+            font-family: 'Segoe UI', system-ui, sans-serif;
             display: flex; flex-direction: column; align-items: center;
-            min-height: 100vh; overflow: hidden;
+            min-height: 100vh; overflow: hidden; padding: 20px;
         }
 
-        /* CRT Scanline Effect */
-        body::before {
-            content: " "; display: block; position: absolute; top: 0; left: 0; bottom: 0; right: 0;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
-            z-index: 200; background-size: 100% 2px, 3px 100%; pointer-events: none;
+        header {
+            display: flex; flex-direction: column; align-items: center;
+            width: 100%; max-width: 400px; gap: 12px; margin-bottom: 20px;
+            z-index: 10;
         }
 
-        #ui-layer {
-            display: flex; gap: 20px; padding: 20px; width: 100%; max-width: 1200px;
-            z-index: 10; justify-content: center;
+        .stats-row { display: flex; width: 100%; gap: 10px; }
+        .stat-box {
+            background: var(--panel); padding: 10px; border-radius: 8px;
+            flex: 1; text-align: center; border: 1px solid var(--grid);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
         }
+        .stat-box small { font-size: 0.65rem; text-transform: uppercase; color: var(--secondary); display: block; letter-spacing: 1px; }
+        .stat-box strong { font-size: 1.3rem; color: #fff; text-shadow: 0 0 5px var(--accent); }
 
-        .card {
-            background: var(--panel); padding: 15px; border-radius: 0;
-            box-shadow: 0 0 20px rgba(0, 242, 255, 0.2); border: 2px solid var(--accent);
-            display: flex; flex-direction: column; gap: 10px; position: relative;
+        .btn-row { display: flex; gap: 8px; width: 100%; }
+        button {
+            flex: 1; background: var(--grid); color: #fff; border: 1px solid var(--accent);
+            padding: 10px; border-radius: 6px; font-size: 0.85rem; cursor: pointer;
+            transition: 0.2s; font-weight: bold; text-transform: uppercase;
         }
+        button:hover { background: var(--accent); color: var(--bg); box-shadow: 0 0 15px var(--accent); }
 
-        .card::after { content: "SYSTEM_ACTIVE"; position: absolute; bottom: -18px; right: 5px; font-size: 0.6rem; color: var(--secondary); }
-
-        .stat-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .stat-box { border: 1px solid var(--grid); padding: 8px; text-align: center; }
-        .stat-box small { font-size: 0.6rem; color: var(--secondary); text-transform: uppercase; letter-spacing: 2px; }
-        .stat-box div { font-weight: bold; font-size: 1.2rem; text-shadow: 0 0 5px var(--accent); }
-
-        #game-view { position: relative; perspective: 1200px; width: min(90vw, 600px); height: min(90vw, 600px); }
-
+        #game-view { position: relative; width: var(--board-size); height: var(--board-size); perspective: 1200px; }
         #board {
-            position: absolute; inset: 0; background: var(--grid); border: 2px solid var(--grid);
-            display: grid; grid-template-columns: repeat(var(--cols), 1fr); gap: 4px;
-            padding: 4px; transform-style: preserve-3d; transition: transform 0.1s ease-out;
-            box-shadow: 0 0 40px rgba(0,0,0,1);
+            position: absolute; inset: 0; background: var(--grid); border-radius: 12px;
+            display: grid; grid-template-columns: repeat(var(--cols), 1fr); gap: 12px;
+            padding: 12px; transform-style: preserve-3d; border: 3px solid var(--panel);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
         }
 
-        .cell { border: 1px solid rgba(0, 242, 255, 0.05); }
-        
+        .cell { background: rgba(0,0,0,0.2); border-radius: 8px; }
         .tile {
-            position: absolute; width: calc((100% - (var(--cols) + 1) * 4px) / var(--cols));
-            height: calc((100% - (var(--cols) + 1) * 4px) / var(--cols));
+            position: absolute; width: calc((100% - (var(--cols) + 1) * 12px) / var(--cols));
+            height: calc((100% - (var(--cols) + 1) * 12px) / var(--cols));
             display: flex; justify-content: center; align-items: center;
-            font-weight: 900; font-size: clamp(0.6rem, 1.5vw, 1.1rem);
-            transition: transform 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275), background 0.3s;
-            z-index: 2; border: 1px solid rgba(255,255,255,0.1);
+            font-weight: 900; font-size: 2.2rem; border-radius: 8px;
+            transition: transform 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 2;
         }
 
-        /* Neon Palette */
-        .v-2 { background: rgba(0, 242, 255, 0.05); color: #444; border-color: #222; }
-        .v-4 { background: rgba(0, 242, 255, 0.1); color: #666; }
-        .v-8 { background: rgba(255, 0, 85, 0.2); color: var(--secondary); border-color: var(--secondary); box-shadow: inset 0 0 10px var(--secondary); }
-        .v-16 { background: rgba(255, 0, 85, 0.4); color: #fff; text-shadow: 0 0 5px #fff; }
-        .v-32 { background: var(--secondary); color: #fff; box-shadow: 0 0 15px var(--secondary); }
-        .v-64 { background: var(--acid); color: #000; box-shadow: 0 0 20px var(--acid); }
-        .v-128 { background: #fff; color: #000; box-shadow: 0 0 25px #fff; }
+        .ghost-tile { opacity: 0.15; border: 2px dashed var(--accent); background: none !important; color: transparent !important; z-index: 1; }
+
+        /* Neon Overdrive Palette */
+        .v-2 { background: #1e2229; color: #8b949e; }
+        .v-4 { background: #21262d; color: #c9d1d9; }
+        .v-8 { background: rgba(88, 166, 255, 0.2); color: #58a6ff; border: 1px solid #58a6ff; }
+        .v-16 { background: #58a6ff; color: #0d1117; }
+        .v-32 { background: #38bdf8; color: #0d1117; }
+        .v-64 { background: #ff0055; color: #fff; box-shadow: 0 0 15px #ff0055; }
+        .v-128 { background: #f85149; color: #fff; }
+        .v-256 { background: #d29922; color: #fff; }
+        .v-512 { background: #db6d28; color: #fff; }
+        .v-1024 { background: #f0e042; color: #000; }
+        .v-2048 { background: #00f2ff; color: #000; box-shadow: 0 0 30px #00f2ff; }
 
         #particle-canvas { position: fixed; inset: 0; pointer-events: none; z-index: 100; }
-
-        button {
-            background: transparent; color: var(--accent); border: 1px solid var(--accent); padding: 10px;
-            font-family: inherit; font-weight: bold; cursor: pointer; transition: 0.2s;
-            clip-path: polygon(0 0, 100% 0, 100% 70%, 90% 100%, 0 100%);
+        
+        #modal {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+            display: none; align-items: center; justify-content: center; z-index: 1000;
+            backdrop-filter: blur(8px);
         }
-        button:hover { background: var(--accent); color: #000; box-shadow: 0 0 15px var(--accent); }
+        .modal-content { background: var(--panel); padding: 40px; border-radius: 16px; text-align: center; border: 2px solid var(--accent); width: 85%; max-width: 350px; }
 
-        .glitch { animation: glitch 0.5s infinite; }
-        @keyframes glitch {
-            0% { transform: translate(0); text-shadow: -2px 0 var(--secondary), 2px 0 var(--accent); }
-            20% { transform: translate(-2px, 2px); }
-            40% { transform: translate(-2px, -2px); text-shadow: 2px 0 var(--secondary), -2px 0 var(--accent); }
-            60% { transform: translate(2px, 2px); }
-            80% { transform: translate(2px, -2px); }
-            100% { transform: translate(0); }
-        }
-
-        #achievements { font-size: 0.6rem; color: #444; margin-top: 5px; }
-        .earned { color: var(--acid) !important; text-shadow: 0 0 5px var(--acid); }
+        .shake { animation: shake 0.2s ease-in-out; }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
     </style>
 </head>
 <body>
 
 <canvas id="particle-canvas"></canvas>
 
-<div id="ui-layer">
-    <div class="card">
-        <h2 class="glitch" style="margin:0; font-size: 1.2rem; letter-spacing: 4px;">// 2048_OVERDRIVE</h2>
-        <div class="stat-group">
-            <div class="stat-box"><small>Data_Score</small><div id="score">0</div></div>
-            <div class="stat-box"><small>Core_Best</small><div id="best">0</div></div>
-        </div>
-        <div class="stat-group">
-            <button onclick="undo()">REV_STEP</button>
-            <button onclick="init()" style="border-color:var(--secondary); color:var(--secondary);">HARD_RST</button>
-        </div>
-        <div id="achievements">
-            STATUS: <br>
-            <span id="ach-1">• [SYNC_128_TILE]</span><br>
-            <span id="ach-2">• [THOUSAND_MOVES]</span>
-        </div>
+<header>
+    <div class="stats-row">
+        <div class="stat-box"><small>Neural_Score</small><strong id="score">0</strong></div>
+        <div class="stat-box"><small>Core_Best</small><strong id="best">0</strong></div>
     </div>
-</div>
+    <div class="btn-row">
+        <button onclick="undo()">Rev_Step</button>
+        <button onclick="restart()">Hard_RST</button>
+        <button onclick="shareScore()" style="background:var(--secondary); border-color:var(--secondary);">Link_Share</button>
+    </div>
+</header>
 
 <div id="game-view">
     <div id="board"></div>
 </div>
 
+<div id="modal">
+    <div class="modal-content">
+        <h2 style="color:var(--secondary); margin-top:0;">CRITICAL_FAILURE</h2>
+        <p style="color:#8b949e; margin-bottom:25px;">Grid saturation reached. No moves remaining in buffer.</p>
+        <button onclick="init()" style="width:100%;">Reboot_System</button>
+    </div>
+</div>
+
 <script>
-    const SIZE = 10;
-    const TOTAL = 100;
+    const SIZE = 4, TOTAL = 16;
     let grid = Array(TOTAL).fill(null), score = 0, moves = 0, tileId = 0;
-    let history = [], best = localStorage.getItem('2048-cyber-best') || 0;
-    
-    // --- Industrial Audio Engine ---
-    let audioCtx = null;
-    const tones = { 'U': 110, 'D': 82.41, 'L': 73.42, 'R': 98.00 }; // Deep Sub Tones
-    
+    let history = [], best = localStorage.getItem('2048-cyber-ultimate-best') || 0;
+    let ghostData = JSON.parse(localStorage.getItem('2048-ultimate-ghost')) || null;
+    let audioCtx = null, unlocked = false;
+
+    // --- Generative Synth ---
     function initAudio() {
-        if (audioCtx) return;
+        if (unlocked) return;
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        unlocked = true;
     }
 
-    function playSound(freq, type = 'sawtooth', duration = 0.15, vol = 0.05) {
-        if (!audioCtx) return;
+    function playMoveNote(dir) {
+        if (!unlocked) return;
+        const freqs = { 'U': 440, 'D': 349.23, 'L': 329.63, 'R': 392.00 };
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
-        osc.type = type;
-        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-        // Add a bit of distortion flavor
-        gain.gain.setValueAtTime(vol, audioCtx.currentTime);
-        gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + duration);
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.start();
-        osc.stop(audioCtx.currentTime + duration);
+        osc.type = 'sine'; osc.frequency.value = freqs[dir];
+        gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.1);
     }
 
-    // --- Particle Burst ---
+    function playMergeChord(val) {
+        if (!unlocked) return;
+        const base = 110 + (Math.log2(val) * 20);
+        [1, 1.25, 1.5].forEach(m => {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'triangle'; osc.frequency.value = base * m;
+            gain.gain.setValueAtTime(0.03, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+        });
+    }
+
+    // --- Particle Engine ---
     const canvas = document.getElementById('particle-canvas');
     const ctx = canvas.getContext('2d');
     let particles = [];
-    window.onresize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
-    window.onresize();
+    function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+    window.onresize = resize; resize();
 
     function createExplosion(x, y, color) {
-        for(let i=0; i<20; i++) {
-            particles.push({
-                x, y, color,
-                w: Math.random() * 8 + 2, h: 2,
-                vx: (Math.random() - 0.5) * 15,
-                vy: (Math.random() - 0.5) * 15,
-                life: 1
-            });
+        for(let i=0; i<15; i++) {
+            particles.push({ x, y, color, r: Math.random()*3+1, vx: (Math.random()-0.5)*12, vy: (Math.random()-0.5)*12, life: 1 });
         }
     }
 
     function updateParticles() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.clearRect(0,0,canvas.width, canvas.height);
         particles.forEach((p, i) => {
-            p.x += p.vx; p.y += p.vy; p.life -= 0.03;
-            ctx.fillStyle = p.color;
-            ctx.fillRect(p.x, p.y, p.w, p.h);
+            p.x += p.vx; p.y += p.vy; p.life -= 0.02;
+            ctx.fillStyle = p.color; ctx.globalAlpha = p.life;
+            ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.fill();
             if(p.life <= 0) particles.splice(i, 1);
         });
         requestAnimationFrame(updateParticles);
     }
     updateParticles();
 
-    // --- Game Logic ---
+    // --- Core Mechanics ---
     function init() {
-        grid.fill(null); score = 0; moves = 0;
-        document.getElementById('board').innerHTML = '';
-        for(let i=0; i<TOTAL; i++) {
-            let c = document.createElement('div'); c.className = 'cell';
-            document.getElementById('board').appendChild(c);
-        }
+        grid.fill(null); score = 0; moves = 0; history = [];
+        document.getElementById('modal').style.display = 'none';
+        const board = document.getElementById('board');
+        board.innerHTML = '';
+        for(let i=0; i<TOTAL; i++) board.appendChild(Object.assign(document.createElement('div'), {className:'cell'}));
         spawn(); spawn(); updateDOM();
     }
 
     function spawn() {
         let empty = grid.map((v, i) => v === null ? i : -1).filter(i => i !== -1);
-        if (empty.length) {
-            grid[empty[Math.floor(Math.random() * empty.length)]] = { id: tileId++, val: 2 };
-        }
+        if (empty.length) grid[empty[Math.floor(Math.random() * empty.length)]] = { id: tileId++, val: Math.random() > 0.1 ? 2 : 4 };
     }
 
     function updateDOM() {
         document.getElementById('score').innerText = score;
         document.getElementById('best').innerText = best;
         const board = document.getElementById('board');
-        const gap = 4;
-        const tileSize = (board.clientWidth - (SIZE + 1) * gap) / SIZE;
+        const tileSize = (board.clientWidth - 60) / 4;
+
+        // Ghost logic
+        if (ghostData && ghostData.seq[moves]) {
+            ghostData.seq[moves].forEach((val, i) => {
+                if (val && !document.getElementById('g'+i)) {
+                    let g = Object.assign(document.createElement('div'), {id:'g'+i, className:'tile ghost-tile'});
+                    g.style.transform = getPos(i, tileSize); board.appendChild(g);
+                }
+            });
+        }
 
         grid.forEach((t, i) => {
             if (!t) return;
-            let el = document.getElementById('t' + t.id);
-            if (!el) {
-                el = document.createElement('div');
-                el.id = 't' + t.id; el.className = 'tile';
-                board.appendChild(el);
-            }
-            el.className = `tile v-${t.val > 128 ? 128 : t.val}`;
+            let el = document.getElementById('t' + t.id) || Object.assign(document.createElement('div'), {id:'t'+t.id, className:'tile'});
+            if (!el.parentElement) board.appendChild(el);
+            el.className = `tile v-${t.val > 2048 ? 2048 : t.val}`;
             el.innerText = t.val;
-            let x = i % SIZE, y = Math.floor(i / SIZE);
-            el.style.transform = `translate(${x * (tileSize + gap) + gap}px, ${y * (tileSize + gap) + gap}px)`;
+            el.style.transform = getPos(i, tileSize);
         });
 
         const ids = new Set(grid.filter(t => t).map(t => 't' + t.id));
-        board.querySelectorAll('.tile').forEach(el => { if(!ids.has(el.id)) el.remove(); });
-        
-        if (score > best) { best = score; localStorage.setItem('2048-cyber-best', best); }
-        if (grid.some(t => t && t.val >= 128)) document.getElementById('ach-1').classList.add('earned');
+        board.querySelectorAll('.tile:not(.ghost-tile)').forEach(el => { if(!ids.has(el.id)) el.remove(); });
+        if (score > best) { best = score; localStorage.setItem('2048-cyber-ultimate-best', best); }
+        checkGameOver();
     }
 
+    function getPos(i, size) { return `translate(${i%4*(size+12)+12}px, ${Math.floor(i/4)*(size+12)+12}px)`; }
+
     function move(dir) {
-        initAudio();
-        playSound(tones[dir], 'sawtooth', 0.1, 0.03);
-        
+        initAudio(); playMoveNote(dir);
         let moved = false;
-        history.push({ grid: JSON.stringify(grid), score });
-        if(history.length > 5) history.shift();
+        let oldGrid = JSON.stringify(grid);
+        history.push({ grid: oldGrid, score, moves });
+        if(history.length > 20) history.shift();
 
         for(let i = 0; i < SIZE; i++) {
             let row = [];
             for(let j = 0; j < SIZE; j++) {
-                let idx = dir === 'L' ? i*SIZE+j : dir === 'R' ? i*SIZE+(SIZE-1-j) : dir === 'U' ? j*SIZE+i : (SIZE-1-j)*SIZE+i;
+                let idx = dir === 'L' ? i*4+j : dir === 'R' ? i*4+(3-j) : dir === 'U' ? j*4+i : (3-j)*4+i;
                 if(grid[idx]) row.push(grid[idx]);
             }
             let nr = [];
@@ -249,14 +248,13 @@
                     let newVal = row[k].val * 2;
                     nr.push({ id: row[k].id, val: newVal });
                     score += newVal; k++; moved = true;
-                    playSound(50 + (newVal), 'square', 0.2, 0.05);
-                    const rect = document.getElementById('board').getBoundingClientRect();
-                    createExplosion(rect.width/2, rect.height/2, newVal >= 32 ? 'var(--secondary)' : 'var(--accent)');
-                } else { nr.push(row[k]); }
+                    playMergeChord(newVal);
+                    createExplosion(window.innerWidth/2, window.innerHeight/2, 'var(--accent)');
+                } else nr.push(row[k]);
             }
             while(nr.length < SIZE) nr.push(null);
             for(let j = 0; j < SIZE; j++) {
-                let idx = dir === 'L' ? i*SIZE+j : dir === 'R' ? i*SIZE+(SIZE-1-j) : dir === 'U' ? j*SIZE+i : (SIZE-1-j)*SIZE+i;
+                let idx = dir === 'L' ? i*4+j : dir === 'R' ? i*4+(3-j) : dir === 'U' ? j*4+i : (3-j)*4+i;
                 if(JSON.stringify(grid[idx]) !== JSON.stringify(nr[j])) moved = true;
                 grid[idx] = nr[j];
             }
@@ -264,20 +262,40 @@
         if(moved) { moves++; spawn(); updateDOM(); } else { history.pop(); }
     }
 
-    function undo() {
-        if(!history.length) return;
-        let last = history.pop();
-        grid = JSON.parse(last.grid); score = last.score; updateDOM();
+    function undo() { if(history.length) { let last = history.pop(); grid = JSON.parse(last.grid); score = last.score; moves = last.moves; updateDOM(); } }
+    function restart() { if(confirm("// INITIATE_SYSTEM_WIPE?")) init(); }
+
+    function checkGameOver() {
+        if(grid.includes(null)) return;
+        for(let i=0; i<TOTAL; i++) {
+            if((i%4<3 && grid[i].val===grid[i+1].val) || (i<12 && grid[i].val===grid[i+4].val)) return;
+        }
+        if(score >= best) localStorage.setItem('2048-ultimate-ghost', JSON.stringify({seq: history.map(h => JSON.parse(h.grid))}));
+        document.getElementById('modal').style.display = 'flex';
+    }
+
+    function shareScore() {
+        const txt = `[NEURAL_LINK_ESTABLISHED] I just synchronized a score of ${score} on Cyber_Flux_2048!`;
+        if(navigator.share) navigator.share({title:'Cyber_Flux', text:txt, url:window.location.href});
+        else { navigator.clipboard.writeText(txt); alert("// DATA_COPIED_TO_CLIPBOARD"); }
     }
 
     window.addEventListener('keydown', e => {
-        if(e.key === 'ArrowUp') move('U'); if(e.key === 'ArrowDown') move('D');
-        if(e.key === 'ArrowLeft') move('L'); if(e.key === 'ArrowRight') move('R');
+        const k = e.key;
+        if(k==='ArrowUp'||k==='w') move('U'); if(k==='ArrowDown'||k==='s') move('D');
+        if(k==='ArrowLeft'||k==='a') move('L'); if(k==='ArrowRight'||k==='d') move('R');
+    });
+
+    let sx, sy;
+    document.addEventListener('touchstart', e => { sx = e.touches[0].clientX; sy = e.touches[0].clientY; initAudio(); });
+    document.addEventListener('touchend', e => {
+        let dx = e.changedTouches[0].clientX - sx, dy = e.changedTouches[0].clientY - sy;
+        if(Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 30) move(dx > 0 ? 'R' : 'L');
+        else if(Math.abs(dy) > 30) move(dy > 0 ? 'D' : 'U');
     });
 
     document.addEventListener('mousemove', e => {
-        let x = (e.clientX / window.innerWidth - 0.5) * 10;
-        let y = (e.clientY / window.innerHeight - 0.5) * -10;
+        let x = (e.clientX / window.innerWidth - 0.5) * 8, y = (e.clientY / window.innerHeight - 0.5) * -8;
         document.getElementById('board').style.transform = `rotateX(${y}deg) rotateY(${x}deg)`;
     });
 
